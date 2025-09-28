@@ -1,0 +1,26 @@
+services:
+  artificialapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: artificialapi
+    restart: unless-stopped
+    ports:
+      - "5700:5700"
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./:/app:rw
+    working_dir: /app
+    networks:
+      - artificialapi_network
+
+networks:
+  artificialapi_network:
+    driver: bridge
