@@ -18,6 +18,8 @@ Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your 
 >
 >Hire [dotfinally](https://dotfinally.com/en) and we can build any AI tool, extension, plugin, API, or website that you need.
 
+---
+
 ## Prerequisites
 
 - Nvidia GPU with CUDA v12.8
@@ -51,7 +53,7 @@ Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your 
 ### SDXL Images
 Generate images using an SDXL checkpoint. Supports text-to-image and image-to-image.
 - POST `http://localhost:5700/api/sdxl`
-- Download a checkpoint, recommended one from: [CivitAI SDXL Checkpoints](https://civitai.com/search/models?baseModel=SDXL%201.0&modelType=Checkpoint&sortBy=models_v9)
+- Download a checkpoint, recommended from: [CivitAI SDXL Checkpoints](https://civitai.com/search/models?baseModel=SDXL%201.0&modelType=Checkpoint&sortBy=models_v9)
 - Optionally download loras: [CivitAI SDXL Loras](https://civitai.com/search/models?baseModel=SDXL%201.0&modelType=LORA&sortBy=models_v9)
 
 #### Parameters
@@ -113,7 +115,7 @@ curl -X POST http://localhost:5700/api/sdxl \
 ### SDXL Image Upscale
 Upscale images using an SDXL checkpoint.
 - POST `http://localhost:5700/api/sdxl/upscale`
-- Download a checkpoint, recommended one from: [CivitAI SDXL Checkpoints](https://civitai.com/search/models?baseModel=SDXL%201.0&modelType=Checkpoint&sortBy=models_v9)
+- Download a checkpoint, recommended from: [CivitAI SDXL Checkpoints](https://civitai.com/search/models?baseModel=SDXL%201.0&modelType=Checkpoint&sortBy=models_v9)
 - Optionally download loras: [CivitAI SDXL Loras](https://civitai.com/search/models?baseModel=SDXL%201.0&modelType=LORA&sortBy=models_v9)
 
 #### Parameters
@@ -165,7 +167,7 @@ curl -X POST http://localhost:5700/api/sdxl/upscale \
 ### Wan Video
 Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to-video.
 - POST `http://localhost:5700/api/wan`
-- Download a Wan GGUF model, recommended one from: [Wan AIO GGUF](https://huggingface.co/befox/WAN2.2-14B-Rapid-AllInOne-GGUF/tree/main/Mega-v3)
+- Download a Wan GGUF model, recommended from: [Wan AIO GGUF](https://huggingface.co/befox/WAN2.2-14B-Rapid-AllInOne-GGUF/tree/main/Mega-v3)
 - Optionally download loras: [CivitAI Wan Loras](https://civitai.com/search/models?modelType=LORA&sortBy=models_v9&query=wan)
 
 #### Parameters
@@ -193,7 +195,7 @@ Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to
 curl -X POST http://localhost:5700/api/wan \
   -H "Content-Type: application/json" \
   -d '{
-    "gguf_path": "models/wan/wan2.2-i2v-rapid-aio-v10-Q8_0.gguf",
+    "gguf_path": "models/wan/wan2.2-rapid-mega-aio-v3-Q8_0.gguf",
     "loras": [
       {
         "path": "models/wan/lora/one.safetensors",
