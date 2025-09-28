@@ -242,8 +242,8 @@ Returns variations of a given prompt, using ollama structured outputs.
 | base_prompt | Yes | string | — | Base prompt you want to vary |
 | variation_prompt | Yes | string | — | Prompt to guide variations of the base prompt |
 | num_variations | No | int | 1 | Number of different variations you want |
-| ollama_url | No | string | `http://localhost:11434/api/generate` | URL path to the generate endpoint on your ollama instance |
-| ollama_model | No | string | `gemma3:27b` | ollama model you want to use |
+| ollama_url | No | string | "http://localhost:11434/api/generate" | URL path to the generate endpoint on your ollama instance |
+| ollama_model | No | string | "gemma3:27b" | ollama model you want to use |
 
 ```
 curl -X POST http://localhost:5700/api/ollama/prompt_variation \
