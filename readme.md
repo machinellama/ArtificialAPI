@@ -167,14 +167,14 @@ curl -X POST http://localhost:5700/api/sdxl/upscale \
 ### Wan Video
 Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to-video.
 - POST `http://localhost:5700/api/wan`
-- Download a Wan GGUF model, recommended from: [Wan AIO GGUF](https://huggingface.co/befox/WAN2.2-14B-Rapid-AllInOne-GGUF/tree/main/Mega-v3)
+- Download a Wan GGUF t2v or i2v model, recommended from: [Wan AIO GGUF](https://huggingface.co/befox/WAN2.2-14B-Rapid-AllInOne-GGUF/tree/main/v10)
 - Optionally download loras: [CivitAI Wan Loras](https://civitai.com/search/models?modelType=LORA&sortBy=models_v9&query=wan)
 
 #### Parameters
 
 | Name | Required | Type | Default | Description |
 |------|----------|------|---------|-------------|
-| gguf_path | Yes | string | — | Path to downloaded Wan GGUF model to use |
+| gguf_path | Yes | string | — | URL or path to Wan GGUF model |
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
 | prompt | No | string | — | Text prompt to generate the video. If not found, will look for .json file with prompt. |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content |
@@ -195,7 +195,7 @@ Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to
 curl -X POST http://localhost:5700/api/wan \
   -H "Content-Type: application/json" \
   -d '{
-    "gguf_path": "models/wan/wan2.2-rapid-mega-aio-v3-Q8_0.gguf",
+    "gguf_path": "https://huggingface.co/befox/WAN2.2-14B-Rapid-AllInOne-GGUF/blob/main/v10/wan2.2-i2v-rapid-aio-v10-Q8_0.gguf",
     "loras": [
       {
         "path": "models/wan/lora/one.safetensors",

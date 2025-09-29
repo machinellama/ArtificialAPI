@@ -31,7 +31,7 @@ def wan():
     "output_folder_path": normalize_path(payload.get("output_folder_path", "output")),
     "output_video_prefix": str(payload.get("output_video_prefix", "")),
     "output_video_suffix": str(payload.get("output_video_suffix", "")),
-    "input_image_path": str(payload.get("input_image_path", "")),
+    "input_image_path": payload.get("input_image_path")
   }
 
   required_param("gguf_path", params["gguf_path"])

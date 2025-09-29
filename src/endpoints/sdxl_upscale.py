@@ -20,7 +20,7 @@ def sdxl_upscale():
   params = {
     "checkpoint_file_path": normalize_path(payload.get("checkpoint_file_path", None)),
     "loras": normalize_loras(payload.get("loras", []), 70),
-    "upscale_path": str(payload.get("upscale_path", "")),
+    "upscale_path": payload.get("upscale_path"),
     "prompt": payload.get("prompt", None),
     "negative_prompt": payload.get("negative_prompt", None),
     "num_images": int(payload.get("num_images", 1)),
