@@ -80,7 +80,7 @@ def get_wan_pipe(
     )
   else:
     transformer = WanTransformer3DModel.from_single_file(
-      gguf_url,
+      gguf_path,
       quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
       dtype=torch.bfloat16,
       config="Wan-AI/Wan2.2-I2V-A14B-Diffusers",

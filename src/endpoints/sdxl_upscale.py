@@ -30,7 +30,6 @@ def sdxl_upscale():
   }
 
   required_param("checkpoint_file_path", params["checkpoint_file_path"])
-  required_param("prompt", params["prompt"])
   required_param("negative_prompt", params["negative_prompt"])
   required_param("upscale_path", params["upscale_path"])
 
@@ -48,14 +47,6 @@ def sdxl_upscale():
       generation_targets.append({"image_path": img_path})
 
     upscale_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], "upscale")
-    prompt = params["prompt"]
-    negative_prompt = params["negative_prompt"]
-
-    prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
-      upscale_pipe,
-      prompt = f"{prompt}, high quality 8k resolution",
-      neg_prompt = f"{negative_prompt}, low quality blurry"
-    )
 
     for target in generation_targets:
       for _ in range(params["num_images"]):
@@ -65,6 +56,30 @@ def sdxl_upscale():
         lower = target["image_path"].lower()
         if "_upscale" in lower:
           continue
+
+        prompt = params["prompt"]
+        if not prompt:
+          json_path = os.path.splitext(target["image_path"])[0] + ".json"
+          if os.path.isfile(json_path):
+            try:
+              with open(json_path, "r", encoding="utf-8") as jf:
+                j = json.load(jf)
+                if isinstance(j, dict) and j.get("prompt"):
+                  prompt = j.get("prompt")
+            except Exception:
+              prompt = None
+
+        # if still no prompt, skip this image
+        if not prompt:
+          continue
+
+        negative_prompt = params["negative_prompt"]
+
+        prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
+          upscale_pipe,
+          prompt = f"{prompt}, high quality 8k resolution",
+          neg_prompt = f"{negative_prompt}, low quality blurry"
+        )
 
         base, _ = os.path.splitext(target["image_path"])
         ts = str(int(time.time()))

@@ -12,7 +12,8 @@ def call_ollama(
   format_schema = None,
   thinking: bool = True,
   stream: bool = False,
-  timeout: int = 300
+  timeout: int = 300,
+  keep_alive: int = None
 ):
   """
   Call Ollama /api/generate endpoint with a prompt and optional format schema.
@@ -26,6 +27,8 @@ def call_ollama(
   }
   if format_schema is not None:
     payload["format"] = format_schema
+  if keep_alive is not None:
+    payload["keep_alive"] = keep_alive
 
   headers = {"Content-Type": "application/json"}
   resp = requests.post(ollama_url, headers=headers, json=payload, timeout=timeout)

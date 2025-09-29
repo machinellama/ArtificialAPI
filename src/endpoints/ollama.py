@@ -79,7 +79,8 @@ def generate_prompt_variations(
       prompt=composed,
       format_schema=schema,
       thinking=False,
-      stream=False
+      stream=False,
+      keep_alive=None
     )
 
     variation_text = ""
@@ -97,5 +98,16 @@ def generate_prompt_variations(
         variation_text = resp.strip()
 
     results.append(variation_text)
+
+  ## unload model before returning
+  call_ollama(
+    ollama_url=ollama_url,
+    model=ollama_model,
+    prompt="",
+    format_schema=schema,
+    thinking=False,
+    stream=False,
+    keep_alive=0
+  )
 
   return results

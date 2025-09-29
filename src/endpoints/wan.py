@@ -35,7 +35,6 @@ def wan():
   }
 
   required_param("gguf_path", params["gguf_path"])
-  required_param("prompt", params["prompt"])
   required_param("negative_prompt", params["negative_prompt"])
 
   divisible_by_x_minus_one("num_frames", params["num_frames"], 4)
@@ -60,8 +59,36 @@ def wan():
 
     for target in generation_targets:
       for _ in range(params["num_videos"]):
+        # determine prompt: use request prompt if provided, otherwise look for same-name .json with prompt field
+        prompt = params["prompt"]
+        if not prompt and target["image_path"]:
+          # if filename contains _upscaled_{ts}, strip that part to find original json next to original image
+          base = os.path.splitext(target["image_path"])[0]
+          # remove trailing _upscaled_<digits> if present
+          import re
+          m = re.match(r"^(.*)_upscaled_\d+$", base)
+          if m:
+            json_path = m.group(1) + ".json"
+          else:
+            json_path = base + ".json"
+
+          if os.path.isfile(json_path):
+            try:
+              with open(json_path, "r", encoding="utf-8") as jf:
+                j = json.load(jf)
+                if isinstance(j, dict) and j.get("prompt"):
+                  prompt = j.get("prompt")
+            except Exception:
+              prompt = None
+
+        # if still no prompt and no image-based prompt, require top-level prompt
+        if not prompt and not params["prompt"]:
+          # skip this target if no prompt available
+          continue
+
         video_params = {
           **params,
+          "prompt": prompt or params["prompt"],
           "seed": create_seed(params["seed"]),
         }
         gen = torch.Generator(device="cuda").manual_seed(video_params["seed"])
@@ -97,9 +124,9 @@ def wan():
         video_params["saved_video"] = path
         video_params["timestamp"] = get_timestamp()
 
-        # save JSON metadata next to image with same base name but .json
-        json_path = os.path.splitext(path)[0] + ".json"
-        with open(json_path, "w", encoding="utf-8") as jf:
+        # save JSON metadata next to video with same base name but .json
+        json_path_out = os.path.splitext(path)[0] + ".json"
+        with open(json_path_out, "w", encoding="utf-8") as jf:
           json.dump(video_params, jf, ensure_ascii=False, indent=2)
 
     return jsonify({ "saved_files": saved_files }), 200

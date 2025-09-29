@@ -1,5 +1,3 @@
-# https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion/stable_diffusion_xl
-
 from flask import Blueprint, request, jsonify
 from PIL import Image
 from sd_embed.embedding_funcs import get_weighted_text_embeddings_sdxl
@@ -46,6 +44,14 @@ def sdxl():
 
   image_paths = get_image_paths(params["input_image_path"])
 
+  prompts = params["prompt"]
+  if isinstance(prompts, str):
+    prompts = [prompts]
+  elif isinstance(prompts, list):
+    prompts = [str(p) for p in prompts]
+  else:
+    prompts = [str(prompts)]
+
   sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], bool(params["input_image_path"]))
   saved_files = []
 
@@ -57,68 +63,71 @@ def sdxl():
     else:
       generation_targets.append({"image_path": None})
 
-    prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
-      sdxl_pipe,
-      prompt = params["prompt"],
-      neg_prompt = params["negative_prompt"]
-    )
+    # Outer loop: iterate over each prompt in prompts array
+    for prompt_text in prompts:
+      prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
+        sdxl_pipe,
+        prompt = prompt_text,
+        neg_prompt = params["negative_prompt"]
+      )
 
-    for target in generation_targets:
-      for _ in range(params["num_images"]):
-        image_params = {
-          **params,
-          "seed": create_seed(params["seed"]),
-        }
-        gen = torch.Generator(device="cuda").manual_seed(image_params["seed"])
+      for target in generation_targets:
+        for _ in range(params["num_images"]):
+          image_params = {
+            **params,
+            "seed": create_seed(params["seed"]),
+            "prompt": prompt_text
+          }
+          gen = torch.Generator(device="cuda").manual_seed(image_params["seed"])
 
-        if target["image_path"] is None:
-          output = sdxl_pipe(
-            prompt_embeds=prompt_embeds,
-            pooled_prompt_embeds=pooled_prompt_embeds,
-            negative_prompt_embeds=prompt_neg_embeds,
-            negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
-            num_inference_steps=image_params["num_steps"],
-            height=image_params["height"],
-            width=image_params["width"],
-            num_images_per_prompt=1,
-            generator=gen
+          if target["image_path"] is None:
+            output = sdxl_pipe(
+              prompt_embeds=prompt_embeds,
+              pooled_prompt_embeds=pooled_prompt_embeds,
+              negative_prompt_embeds=prompt_neg_embeds,
+              negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+              num_inference_steps=image_params["num_steps"],
+              height=image_params["height"],
+              width=image_params["width"],
+              num_images_per_prompt=1,
+              generator=gen
+            )
+          else:
+            init_image = Image.open(target["image_path"]).convert("RGB")
+            target_size = (image_params["width"], image_params["height"])
+            init_image = init_image.resize(target_size, resample=Image.LANCZOS)
+            image_params["reference_image_path"] = target["image_path"]
+
+            output = sdxl_pipe(
+              prompt_embeds=prompt_embeds,
+              pooled_prompt_embeds=pooled_prompt_embeds,
+              negative_prompt_embeds=prompt_neg_embeds,
+              negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+              image=init_image,
+              strength=image_params["input_image_strength"] / 100,
+              num_inference_steps=image_params["num_steps"],
+              height=image_params["height"],
+              width=image_params["width"],
+              num_images_per_prompt=1,
+              generator=gen
+            )
+
+          image = output.images[0]
+          path = get_image_save_path(
+            image_params["output_folder_path"],
+            image_params["output_image_prefix"],
+            image_params["output_image_suffix"]
           )
-        else:
-          init_image = Image.open(target["image_path"]).convert("RGB")
-          target_size = (image_params["width"], image_params["height"])
-          init_image = init_image.resize(target_size, resample=Image.LANCZOS)
-          image_params["reference_image_path"] = target["image_path"]
+          image.save(path, format="PNG")
+          saved_files.append(path)
 
-          output = sdxl_pipe(
-            prompt_embeds=prompt_embeds,
-            pooled_prompt_embeds=pooled_prompt_embeds,
-            negative_prompt_embeds=prompt_neg_embeds,
-            negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
-            image=init_image,
-            strength=image_params["input_image_strength"] / 100,
-            num_inference_steps=image_params["num_steps"],
-            height=image_params["height"],
-            width=image_params["width"],
-            num_images_per_prompt=1,
-            generator=gen
-          )
+          image_params["saved_image"] = path
+          image_params["timestamp"] = get_timestamp()
 
-        image = output.images[0]
-        path = get_image_save_path(
-          image_params["output_folder_path"],
-          image_params["output_image_prefix"],
-          image_params["output_image_suffix"]
-        )
-        image.save(path, format="PNG")
-        saved_files.append(path)
-
-        image_params["saved_image"] = path
-        image_params["timestamp"] = get_timestamp()
-
-        # save JSON metadata next to image with same base name but .json
-        json_path = os.path.splitext(path)[0] + ".json"
-        with open(json_path, "w", encoding="utf-8") as jf:
-          json.dump(image_params, jf, ensure_ascii=False, indent=2)
+          # save JSON metadata next to image with same base name but .json
+          json_path = os.path.splitext(path)[0] + ".json"
+          with open(json_path, "w", encoding="utf-8") as jf:
+            json.dump(image_params, jf, ensure_ascii=False, indent=2)
 
     return jsonify({"saved_files": saved_files}), 200
 
