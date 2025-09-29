@@ -62,7 +62,7 @@ Generate images using an SDXL checkpoint. Supports text-to-image and image-to-im
 |------|----------|------|---------|-------------|
 | checkpoint_file_path | Yes | string | — | Path to the SDXL checkpoint to load |
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
-| prompt | Yes | string | — | Text prompt to generate the image |
+| prompt | Yes | string | — | Text prompt to generate the image, can be a single string or a list of strings. If list, each prompt will trigger a request with other params. |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content |
 | seed | No | integer| — | Starting randomness of image. Empty or -1 will use random seeds; else given seed will be used for all images. |
 | width | No | integer | 1024 | Output image width in pixels. Must be divisible by 8. |
@@ -125,7 +125,7 @@ Upscale images using an SDXL checkpoint.
 | checkpoint_file_path | Yes | string | — | Path to the SDXL checkpoint to load |
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
 | upscale_path | Yes | string | — | Path to image or folder of images for upscaling. If folder, then each image in the folder will trigger a separate upscale request. |
-| prompt | Yes | string | — | Text prompt to generate the image |
+| prompt | No | string | — | Text prompt to generate the image. If not provided, will look for .json file with prompt. |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content |
 | num_images | No | integer | 1 | Number of images to generate for the prompt. Each image will be saved separately. |
 | num_steps | No | integer | 30 | Number of inference steps |
@@ -176,7 +176,7 @@ Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to
 |------|----------|------|---------|-------------|
 | gguf_path | Yes | string | — | Path to downloaded Wan GGUF model to use |
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
-| prompt | Yes | string | — | Text prompt to generate the video |
+| prompt | No | string | — | Text prompt to generate the video. If not found, will look for .json file with prompt. |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content |
 | seed | No | integer| — | Starting randomness of video. Empty or -1 will use random seeds; else given seed will be used for all videos. |
 | width | No | integer | 480 | Output video width in pixels. Width - 1 must be divisible by 4. |
