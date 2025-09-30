@@ -1,12 +1,8 @@
-
 # ArtificialAPI
-
 
 API built to enable scripting of automated AI media generation at mass scale.
 
-
 Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your mileage may vary.
-
 
 - [SDXL: text-to-image and image-to-image](#sdxl-images)
 - [SDXL: upscale images](#sdxl-image-upscale)
@@ -14,23 +10,40 @@ Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your 
 - [Ollama: prompt variations](#ollama-prompt-variations)
 - More coming soon! contributions welcome
 
-
 ---
-
 
 >Need help making your own AI tools or websites?
 >
 >Hire [dotfinally](https://dotfinally.com/en) and we can build any AI tool, extension, plugin, API, or website that you need.
 
-
 ---
-
 
 ## Prerequisites
 
-
 - Nvidia GPU with CUDA v12.8
-calhost:5700` by default
+- (optional) Docker
+- (optional) Ollama
+
+## Run locally in Docker
+
+- Start: `docker compose up -d`
+- Stop: `docker compose down`
+- Stop and clear: `docker compose down --volumes --remove-orphans`
+- Stop, clear, rebuild, and restart: `docker compose down --volumes  --remove-orphans && docker compose up -d --build --force-recreate`
+
+## Run locally
+
+- Use an isolated Python environment (conda, venv, etc.)
+- `conda create --name=aapi python=3.12.11`
+- `conda activate aapi`
+- `sudo apt update`
+- `sudo apt install nvidia-cuda-toolkit`
+  - Verify with `nvcc --version`
+- `pip install -r requirements.txt`
+- `pip install -U xformers --index-url https://download.pytorch.org/whl/cu128`
+- `pip install git+https://github.com/xhinker/sd_embed.git@main`
+- `python -m src.server`
+  - Runs at `http://localhost:5700` by default
   - change host/port in server.py if needed
 
 ## Endpoints
