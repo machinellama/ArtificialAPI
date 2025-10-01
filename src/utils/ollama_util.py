@@ -35,6 +35,17 @@ def call_ollama(
   resp.raise_for_status()
   resp_json = resp.json()
 
+  ## unload model before returning
+  requests.post(
+    ollama_url,
+    headers=headers,
+    json={
+      "model": model,
+      "keep_alive": 0
+    },
+    timeout=timeout
+  )
+
   # Ollama returns a field like resp_json["response"] which is a stringified JSON when using format
   # If format was provided try to parse resp_json["response"], otherwise return entire resp_json
   if isinstance(resp_json, dict) and "response" in resp_json:

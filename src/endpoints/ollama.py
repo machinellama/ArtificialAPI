@@ -99,15 +99,4 @@ def generate_prompt_variations(
 
     results.append(variation_text)
 
-  ## unload model before returning
-  call_ollama(
-    ollama_url=ollama_url,
-    model=ollama_model,
-    prompt="",
-    format_schema=schema,
-    thinking=False,
-    stream=False,
-    keep_alive=0
-  )
-
   return results
