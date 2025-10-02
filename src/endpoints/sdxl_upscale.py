@@ -6,6 +6,7 @@ from sd_embed.embedding_funcs import get_weighted_text_embeddings_sdxl
 from src.utils.endpoint_util import required_param, within_range_inclusive, normalize_path
 from src.utils.file_util import get_image_paths, get_image_save_path, get_timestamp
 from src.utils.sdxl_util import get_sdxl_pipe, normalize_loras
+from src.utils.cache_util import cache_set, cache_get
 import json
 import os
 import torch
@@ -30,7 +31,6 @@ def sdxl_upscale():
   }
 
   required_param("checkpoint_file_path", params["checkpoint_file_path"])
-  required_param("negative_prompt", params["negative_prompt"])
   required_param("upscale_path", params["upscale_path"])
 
   within_range_inclusive("input_image_strength", params["input_image_strength"], 1, 100)
@@ -46,7 +46,11 @@ def sdxl_upscale():
     for img_path in image_paths:
       generation_targets.append({"image_path": img_path})
 
-    upscale_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], "upscale")
+    cache_key = "SDXL" + ",".join(lora["path"] for lora in params["loras"])
+    sdxl_pipe = cache_get(cache_key)
+    if sdxl_pipe is None:
+      sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], "upscale")
+      cache_set(cache_key, sdxl_pipe)
 
     for target in generation_targets:
       for _ in range(params["num_images"]):
@@ -74,9 +78,19 @@ def sdxl_upscale():
           continue
 
         negative_prompt = params["negative_prompt"]
+        if not negative_prompt:
+          json_path = os.path.splitext(target["image_path"])[0] + ".json"
+          if os.path.isfile(json_path):
+            try:
+              with open(json_path, "r", encoding="utf-8") as jf:
+                j = json.load(jf)
+                if isinstance(j, dict) and j.get("negative_prompt"):
+                  negative_prompt = j.get("negative_prompt")
+            except Exception:
+              negative_prompt = None
 
         prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
-          upscale_pipe,
+          sdxl_pipe,
           prompt = f"{prompt}, high quality 8k resolution",
           neg_prompt = f"{negative_prompt}, low quality blurry"
         )
@@ -90,7 +104,7 @@ def sdxl_upscale():
         new_w, new_h = int(orig_w * params["scale"]), int(orig_h * params["scale"])
         big_img = img.resize((new_w, new_h), resample=Image.LANCZOS)
 
-        output = upscale_pipe(
+        output = sdxl_pipe(
           prompt_embeds=prompt_embeds,
           pooled_prompt_embeds=pooled_prompt_embeds,
           negative_prompt_embeds=prompt_neg_embeds,

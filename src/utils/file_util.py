@@ -1,6 +1,7 @@
 import os
 import time
 import tzlocal
+import re
 from datetime import datetime
 
 def get_image_paths(input_image_path):
@@ -79,3 +80,22 @@ def get_timestamp():
   timestamp_str = f"{iso_ts} ({tz_abbr})" if tz_abbr else iso_ts
 
   return timestamp_str
+
+def get_json_value(base, key):
+  m = re.match(r"^(.*)_upscaled_\d+$", base)
+
+  if m:
+    json_path = m.group(1) + ".json"
+  else:
+    json_path = base + ".json"
+
+  if os.path.isfile(json_path):
+    try:
+      with open(json_path, "r", encoding="utf-8") as jf:
+        j = json.load(jf)
+        if isinstance(j, dict) and j.get(key):
+          value = j.get(key)
+    except Exception:
+      value = None
+
+  return value

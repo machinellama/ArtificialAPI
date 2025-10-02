@@ -17,9 +17,9 @@ os.environ["TOKENIZERS_PARALLELISM"]="false"
 def get_wan_pipe(
   gguf_path,
   loras,
-  image_paths
+  is_image
 ):
-  if bool(image_paths):
+  if is_image:
     transformer = WanTransformer3DModel.from_single_file(
       gguf_path,
       quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),

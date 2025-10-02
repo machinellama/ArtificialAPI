@@ -5,6 +5,7 @@ from src.utils.endpoint_util import required_param, divisible_by_x, within_range
 from src.utils.file_util import get_image_paths, get_image_save_path, get_timestamp
 from src.utils.logger import log
 from src.utils.sdxl_util import get_sdxl_pipe, normalize_loras
+from src.utils.cache_util import cache_set, cache_get
 import gc
 import json
 import os
@@ -52,7 +53,12 @@ def sdxl():
   else:
     prompts = [str(prompts)]
 
-  sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], bool(params["input_image_path"]))
+  cache_key = "SDXL" + ",".join(lora["path"] for lora in params["loras"])
+  sdxl_pipe = cache_get(cache_key)
+  if sdxl_pipe is None:
+    sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], bool(params["input_image_path"]))
+    cache_set(cache_key, sdxl_pipe)
+
   saved_files = []
 
   try:

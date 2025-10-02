@@ -1,13 +1,17 @@
 from diffusers.utils import export_to_video, load_image
 from flask import Blueprint, request, jsonify
-from src.utils.endpoint_util import required_param, divisible_by_x_minus_one, create_seed, normalize_path
-from src.utils.file_util import get_image_paths, get_video_save_path, get_timestamp
+from src.utils.endpoint_util import required_param, divisible_by_x_minus_one, divisible_by_x, create_seed, normalize_path
+from src.utils.file_util import get_image_paths, get_video_save_path, get_timestamp, get_json_value
 from src.utils.wan_util import get_wan_pipe
 from src.utils.sdxl_util import normalize_loras
+from src.utils.image_util import compute_dimensions_from_image
+from src.utils.cache_util import cache_set, cache_get
 import gc
 import json
 import os
+import re
 import torch
+from PIL import Image
 
 wan_bp = Blueprint("wan", __name__, url_prefix="/api")
 
@@ -21,8 +25,8 @@ def wan():
     "prompt": payload.get("prompt", None),
     "negative_prompt": payload.get("negative_prompt", None),
     "seed": payload.get("seed", None),
-    "width": int(payload.get("width", 480)),
-    "height": int(payload.get("height", 720)),
+    "width": payload.get("width", None),
+    "height": payload.get("height", None),
     "num_videos": int(payload.get("num_videos", 1)),
     "num_steps": int(payload.get("num_steps", 4)),
     "num_frames": int(payload.get("num_frames", 81)),
@@ -35,20 +39,31 @@ def wan():
   }
 
   required_param("gguf_path", params["gguf_path"])
-  required_param("negative_prompt", params["negative_prompt"])
 
   divisible_by_x_minus_one("num_frames", params["num_frames"], 4)
-  
+
+  # width/height may be None; validate only when provided
+  if params["height"] is not None:
+    divisible_by_x("height", int(params["height"]), 16)
+    params["height"] = int(params["height"])
+  if params["width"] is not None:
+    divisible_by_x("width", int(params["width"]), 16)
+    params["width"] = int(params["width"])
+
   image_paths = get_image_paths(params["input_image_path"])
 
   saved_files = []
 
   try:
-    pipeline = get_wan_pipe(
-      params["gguf_path"],
-      params["loras"],
-      image_paths
-    )
+    cache_key = "WAN" + ",".join(lora["path"] for lora in params["loras"]) + str(bool(image_paths))
+    pipeline = cache_get(cache_key)
+    if pipeline is None:
+      pipeline = get_wan_pipe(
+        params["gguf_path"],
+        params["loras"],
+        bool(image_paths)
+      )
+      cache_set(cache_key, pipeline)
 
     generation_targets = []
     if image_paths:
@@ -62,34 +77,47 @@ def wan():
         # determine prompt: use request prompt if provided, otherwise look for same-name .json with prompt field
         prompt = params["prompt"]
         if not prompt and target["image_path"]:
-          # if filename contains _upscaled_{ts}, strip that part to find original json next to original image
           base = os.path.splitext(target["image_path"])[0]
-          # remove trailing _upscaled_<digits> if present
-          import re
-          m = re.match(r"^(.*)_upscaled_\d+$", base)
-          if m:
-            json_path = m.group(1) + ".json"
-          else:
-            json_path = base + ".json"
+          prompt = get_json_value(base, "prompt")
 
-          if os.path.isfile(json_path):
-            try:
-              with open(json_path, "r", encoding="utf-8") as jf:
-                j = json.load(jf)
-                if isinstance(j, dict) and j.get("prompt"):
-                  prompt = j.get("prompt")
-            except Exception:
-              prompt = None
-
-        # if still no prompt and no image-based prompt, require top-level prompt
         if not prompt and not params["prompt"]:
-          # skip this target if no prompt available
-          continue
+          continue # skip if no prompt
+
+        negative_prompt = params["negative_prompt"]
+        if not negative_prompt and target["image_path"]:
+          base = os.path.splitext(target["image_path"])[0]
+          negative_prompt = get_json_value(base, "negative_prompt")
+
+        # compute per-target width/height if not provided
+        width = params["width"]
+        height = params["height"]
+        if target["image_path"] and (width is None or height is None):
+          img_w, img_h = compute_dimensions_from_image(target["image_path"], max_dim=720)
+          if img_w and img_h:
+            # use image dims for whichever missing, otherwise keep provided
+            if width is None:
+              width = img_w
+            if height is None:
+              height = img_h
+        # fallback defaults if still None
+        if width is None:
+          width = 480
+        if height is None:
+          height = 720
+        # ensure divisible by 16
+        width = int(width) - (int(width) % 16)
+        height = int(height) - (int(height) % 16)
+        # clamp to max 720
+        width = min(width, 720)
+        height = min(height, 720)
 
         video_params = {
           **params,
           "prompt": prompt or params["prompt"],
+          "negative_prompt": negative_prompt or params["negative_prompt"],
           "seed": create_seed(params["seed"]),
+          "width": width,
+          "height": height
         }
         gen = torch.Generator(device="cuda").manual_seed(video_params["seed"])
 
