@@ -1,8 +1,6 @@
 # ArtificialAPI
 
-There are a billion GUIs for image and video AI generation, but not many APIs that are easy to run and use with your own local scripts.
-
-Built to enable scripting of automated media AI generation at mass scale.
+API built to enable scripting of automated AI media generation at mass scale.
 
 Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your mileage may vary.
 
