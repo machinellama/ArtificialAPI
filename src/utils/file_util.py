@@ -4,8 +4,8 @@ import tzlocal
 import re
 from datetime import datetime
 import subprocess
+import imageio
 from pathlib import Path
-import cv2
 
 def get_image_paths(input_image_path):
   image_paths = []
@@ -103,28 +103,13 @@ def get_json_value(base, key):
 
   return value
 
-def concatenate_mp4s(file_paths, output_path, fps=None, fourcc="mp4v"):
-  paths = [Path(p).resolve() for p in file_paths]
-  out_path = Path(output_path).resolve()
-  first_cap = cv2.VideoCapture(str(paths[0]))
-  width = int(first_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-  height = int(first_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-  first_fps = first_cap.get(cv2.CAP_PROP_FPS) or 0
-  first_cap.release()
-
-  target_fps = fps if fps is not None else (first_fps if first_fps > 0 else 30.0)
-  fourcc_int = cv2.VideoWriter_fourcc(*fourcc)
-  out_path.parent.mkdir(parents=True, exist_ok=True)
-  writer = cv2.VideoWriter(str(out_path), fourcc_int, float(target_fps), (width, height))
-
+def concatenate_mp4s(file_paths, output_path, fps=None):
+  paths = [str(Path(p).resolve()) for p in file_paths]
+  writer = imageio.get_writer(str(output_path), fps=fps or 30, codec='libx264')
   for p in paths:
-    cap = cv2.VideoCapture(str(p))
-    while True:
-      ret, frame = cap.read()
-      if not ret:
-        break
-      writer.write(frame)
-    cap.release()
-
-  writer.release()
-  return str(out_path)
+    reader = imageio.get_reader(p)
+    for frame in reader:
+      writer.append_data(frame)
+    reader.close()
+  writer.close()
+  return str(Path(output_path).resolve())
