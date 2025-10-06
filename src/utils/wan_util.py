@@ -17,7 +17,8 @@ os.environ["TOKENIZERS_PARALLELISM"]="false"
 def get_wan_pipe(
   gguf_path,
   loras,
-  is_image
+  is_image,
+  segment_index
 ):
   if is_image:
     transformer = WanTransformer3DModel.from_single_file(
@@ -125,14 +126,27 @@ def get_wan_pipe(
       torch_dtype=torch.bfloat16
     )
 
+  return load_loras(pipeline, loras, segment_index)
+
+def load_loras(pipeline, loras, segment_index):
   adapter_names = []
   adapter_weights = []
-  for lora in loras:
-    pipeline.load_lora_weights(lora["path"], adapter_name=keep_alnum(lora["path"]))
-    adapter_names.append(keep_alnum(lora["path"]))
-    adapter_weights.append(lora["strength"] / 100)
 
   if loras:
+    for i, lora in enumerate(loras):
+      if segment_index and segment_index > -1:
+        try:
+          pipeline.load_lora_weights(lora["path"], adapter_name=keep_alnum(f"lora-{i}"), hotswap=True)
+        except:
+          pipeline.load_lora_weights(lora["path"], adapter_name=keep_alnum(f"lora-{i}"))
+
+        adapter_names.append(keep_alnum(f"lora-{i}"))
+      else:
+        pipeline.load_lora_weights(lora["path"], adapter_name=keep_alnum(lora["path"]))
+        adapter_names.append(keep_alnum(lora["path"]))
+
+      adapter_weights.append(lora["strength"] / 100)
+
     pipeline.set_adapters(adapter_names, adapter_weights=adapter_weights)
     pipeline.set_lora_device(adapter_names=adapter_names, device="cuda:0")
 
