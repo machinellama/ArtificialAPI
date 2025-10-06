@@ -7,6 +7,7 @@ Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your 
 - [SDXL: text-to-image and image-to-image](#sdxl-images)
 - [SDXL: upscale images](#sdxl-image-upscale)
 - [Wan: text-to-video and image-to-video](#wan-video)
+- [Wan: generate multiple segments for long videos](#wan-video-segments)
 - [Ollama: prompt variations](#ollama-prompt-variations)
 - More coming soon! contributions welcome
 
@@ -193,7 +194,7 @@ Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to
 curl -X POST http://localhost:5700/api/wan \
   -H "Content-Type: application/json" \
   -d '{
-    "gguf_path": "https://huggingface.co/befox/WAN2.2-14B-Rapid-AllInOne-GGUF/blob/main/v10/wan2.2-i2v-rapid-aio-v10-Q8_0.gguf",
+    "gguf_path": "models/wan/wan2.2-i2v-rapid-aio-v10-Q8_0.gguf",
     "loras": [
       {
         "path": "models/wan/lora/one.safetensors",
@@ -224,6 +225,52 @@ curl -X POST http://localhost:5700/api/wan \
   "saved_files": [
     "output/wan_videos/cat-1758590980-v1.mp4",
     "output/wan_videos/cat-1758590999-v1.mp4"
+  ]
+}
+```
+
+### Wan Video Segments
+Generate multiple Wan video segments and combine them into a single long video.
+- POST `http://localhost:5700/api/wan/segments`
+- Each segment in the request will have the same parameters as the /wan endpoint above
+- Each segment will use the parameters from the first segment as a base, so you can just define fields that need to change for a segment (like prompt or loras)
+- If no input_image_path is given for a segment, then the last frame of the previous segment will be used as the starting image
+
+```
+curl -X POST http://localhost:5700/api/wan/segments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "segments": [
+      {
+        "gguf_path": "models/wan/wan2.2-i2v-rapid-aio-v10-Q8_0.gguf",
+        "loras": [
+          {
+            "path": "models/wan/lora/one.safetensors",
+            "strength": 80
+          }
+        ],
+        "prompt": "a cat flying through the sky",
+        "negative_prompt": "blurry, cartoon, anime",
+        "output_folder_path": "output/wan_videos",
+        "input_image_path": "input/reference/test.png"
+      },
+      {
+        "loras": [
+          {
+            "path": "models/wan/lora/two.safetensors",
+            "strength": 80
+          }
+        ],
+        "prompt": "a cat flying into space",
+      }
+    ]
+  }'
+---
+{
+  "all_files": [
+    "output/wan_videos/cat-1758590980-v1.mp4",
+    "output/wan_videos/cat-1758590999-v1.mp4",
+    "output/wan_videos/cat-1758591200-v1.mp4"
   ]
 }
 ```

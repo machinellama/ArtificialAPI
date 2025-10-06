@@ -94,7 +94,8 @@ def wan_segments():
       segments[0].get("output_video_prefix"),
       segments[0].get("output_video_suffix")
     )
-    concatenate_mp4s(mp4s, combined_file_path)
+    concat_output_path = concatenate_mp4s(mp4s, combined_file_path)
+    all_files.extend(concat_output_path)
 
   return jsonify({"all_files": all_files}), 200
 
