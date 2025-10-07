@@ -195,9 +195,6 @@ def execute_wan(payload):
         # ensure divisible by 16
         width = int(width) - (int(width) % 16)
         height = int(height) - (int(height) % 16)
-        # clamp to max 720
-        width = min(width, 720)
-        height = min(height, 720)
 
         video_params = {
           **params,

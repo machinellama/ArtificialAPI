@@ -1,3 +1,5 @@
+from PIL import Image
+
 def compute_dimensions_from_image(img_path, max_dim=720):
   try:
     with Image.open(img_path) as im:

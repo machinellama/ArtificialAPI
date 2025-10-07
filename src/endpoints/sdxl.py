@@ -6,6 +6,7 @@ from src.utils.file_util import get_image_paths, get_image_save_path, get_timest
 from src.utils.logger import log
 from src.utils.sdxl_util import get_sdxl_pipe, normalize_loras
 from src.utils.cache_util import cache_set, cache_get
+from src.utils.image_util import compute_dimensions_from_image
 import gc
 import json
 import os
@@ -24,8 +25,8 @@ def sdxl():
     "prompt": payload.get("prompt", None),
     "negative_prompt": payload.get("negative_prompt", None),
     "seed": payload.get("seed", None),
-    "width": int(payload.get("width", 1024)),
-    "height": int(payload.get("height", 1024)),
+    "width": payload.get("width", None),
+    "height": payload.get("height", None),
     "num_images": int(payload.get("num_images", 1)),
     "num_steps": int(payload.get("num_steps", 60)),
     "output_folder_path": normalize_path(payload.get("output_folder_path", "output")),
@@ -38,8 +39,10 @@ def sdxl():
   required_param("prompt", params["prompt"])
   required_param("negative_prompt", params["negative_prompt"])
 
-  divisible_by_x("height", params["height"], 8)
-  divisible_by_x("width", params["width"], 8)
+  if params["height"] is not None:
+    divisible_by_x("height", params["height"], 8)
+  if params["width"] is not None:
+    divisible_by_x("width", params["width"], 8)
 
   within_range_inclusive("input_image_strength", params["input_image_strength"], 11, 100)
 
@@ -86,6 +89,30 @@ def sdxl():
           }
           gen = torch.Generator(device="cuda").manual_seed(image_params["seed"])
 
+          # compute per-target width/height if not provided
+          width = params.get("width")
+          height = params.get("height")
+
+          if target.get("image_path") and (width is None or height is None):
+            img_w, img_h = compute_dimensions_from_image(target["image_path"], max_dim=1024)
+            if img_w and img_h:
+              if width is None:
+                width = img_w
+              if height is None:
+                height = img_h
+
+          # fallback defaults if still None
+          if width is None:
+            width = 1024
+          if height is None:
+            height = 1024
+
+          # ensure integers, at least 8, then make divisible by 8
+          width = max(8, int(width))
+          height = max(8, int(height))
+          width = width - (width % 8)
+          height = height - (height % 8)
+
           if target["image_path"] is None:
             output = sdxl_pipe(
               prompt_embeds=prompt_embeds,
@@ -93,14 +120,14 @@ def sdxl():
               negative_prompt_embeds=prompt_neg_embeds,
               negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
               num_inference_steps=image_params["num_steps"],
-              height=image_params["height"],
-              width=image_params["width"],
+              height=height,
+              width=width,
               num_images_per_prompt=1,
               generator=gen
             )
           else:
             init_image = Image.open(target["image_path"]).convert("RGB")
-            target_size = (image_params["width"], image_params["height"])
+            target_size = (width, height)
             init_image = init_image.resize(target_size, resample=Image.LANCZOS)
             image_params["reference_image_path"] = target["image_path"]
 
@@ -112,8 +139,8 @@ def sdxl():
               image=init_image,
               strength=image_params["input_image_strength"] / 100,
               num_inference_steps=image_params["num_steps"],
-              height=image_params["height"],
-              width=image_params["width"],
+              height=height,
+              width=width,
               num_images_per_prompt=1,
               generator=gen
             )
