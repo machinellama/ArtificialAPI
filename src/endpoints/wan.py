@@ -242,6 +242,10 @@ def execute_wan(payload):
         with open(json_path_out, "w", encoding="utf-8") as jf:
           json.dump(video_params, jf, ensure_ascii=False, indent=2)
 
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
     return saved_files, pipeline
 
   finally:

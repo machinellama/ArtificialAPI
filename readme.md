@@ -61,7 +61,8 @@ Generate images using an SDXL checkpoint. Supports text-to-image and image-to-im
 |------|----------|------|---------|-------------|
 | checkpoint_file_path | Yes | string | — | Path to the SDXL checkpoint to load |
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
-| prompt | Yes | string | — | Text prompt to generate the image, can be a single string or a list of strings. If list, each prompt will trigger a request with other params. |
+| prompt | Yes | string | — | Text prompt to generate the image, can be a single string or a list of strings. If list, each prompt will trigger a request with other params. Optionally include keys in double brackets for variations. |
+| prompt_replacements | No | object | — | Use with double bracket keys in prompts; each key in this array can have an array of variations.  |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content |
 | seed | No | integer| — | Starting randomness of image. Empty or -1 will use random seeds; else given seed will be used for all images. |
 | width | No | integer | 1024 | Output image width in pixels. Must be divisible by 8. |
@@ -89,7 +90,15 @@ curl -X POST http://localhost:5700/api/sdxl \
         "strength": 50
       } 
     ],
-    "prompt": "A fantasy landscape, vibrant colors, cinematic lighting",
+    "prompt": [
+      "A {{landscape_type}} landscape, vibrant colors, {{lighting_type}} lighting",
+      "A {{species}} flying through the air",
+    ],
+    "prompt_replacements": {
+      "landscape_type": ["fantasy", "cyberpunk"],
+      "lighting_type": ["cinematic", "neon"],
+      "species": ["cat", "dog", "hamster"]
+    },
     "negative_prompt": "blurry, cartoon",
     "seed": -1,
     "width": 1024,
@@ -125,7 +134,7 @@ Upscale images using an SDXL checkpoint.
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
 | upscale_path | Yes | string | — | Path to image or folder of images for upscaling. If folder, then each image in the folder will trigger a separate upscale request. |
 | prompt | No | string | — | Text prompt to generate the image. If not provided, will look for .json file with prompt. |
-| negative_prompt | Yes | string | — | Negative prompt to discourage content |
+| negative_prompt | Yes | string | — | Negative prompt to discourage content. If not provided, will look for .json file with negative_prompt. |
 | num_images | No | integer | 1 | Number of images to generate for the prompt. Each image will be saved separately. |
 | num_steps | No | integer | 30 | Number of inference steps |
 | input_image_strength | No | integer | 51 | Amount of change applied to input image, must be between 1 and 100 inclusive. Higher number means more change. |

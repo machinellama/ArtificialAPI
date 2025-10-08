@@ -11,6 +11,7 @@ import json
 import os
 import torch
 import time
+import gc
 
 sdxl_upscale_bp = Blueprint("sdxl_upscale", __name__, url_prefix="/api")
 
@@ -120,6 +121,12 @@ def sdxl_upscale():
         image.save(out_path)
         saved_files.append(out_path)
 
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
     return jsonify({"saved_files": saved_files}), 200
   finally:
+    gc.collect()
     torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()

@@ -7,6 +7,7 @@ from src.utils.logger import log
 from src.utils.sdxl_util import get_sdxl_pipe, normalize_loras
 from src.utils.cache_util import cache_set, cache_get
 from src.utils.image_util import compute_dimensions_from_image
+from src.utils.prompt_util import generate_prompt_variations
 import gc
 import json
 import os
@@ -23,6 +24,7 @@ def sdxl():
     "checkpoint_file_path": normalize_path(payload.get("checkpoint_file_path", None)),
     "loras": normalize_loras(payload.get("loras", []), 70),
     "prompt": payload.get("prompt", None),
+    "prompt_replacements": payload.get("prompt_replacements", None),
     "negative_prompt": payload.get("negative_prompt", None),
     "seed": payload.get("seed", None),
     "width": payload.get("width", None),
@@ -56,6 +58,16 @@ def sdxl():
   else:
     prompts = [str(prompts)]
 
+  expanded_prompts = []
+  prompt_variations = params.get("prompt_replacements") or {}
+  for p in prompts:
+    variations = generate_prompt_variations(p, prompt_variations)
+    expanded_prompts.extend(variations)
+
+  prompts = expanded_prompts
+
+  print(f"Number of SDXL prompts to execute: {len(prompts)}")
+
   cache_key = "SDXL" + ",".join(lora["path"] for lora in params["loras"])
   sdxl_pipe = cache_get(cache_key)
   if sdxl_pipe is None:
@@ -73,7 +85,9 @@ def sdxl():
       generation_targets.append({"image_path": None})
 
     # Outer loop: iterate over each prompt in prompts array
-    for prompt_text in prompts:
+    for pi, prompt_text in enumerate(prompts):
+      print(f"SDXL prompt {pi + 1}: {prompt_text}")
+
       prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
         sdxl_pipe,
         prompt = prompt_text,
@@ -161,6 +175,10 @@ def sdxl():
           json_path = os.path.splitext(path)[0] + ".json"
           with open(json_path, "w", encoding="utf-8") as jf:
             json.dump(image_params, jf, ensure_ascii=False, indent=2)
+
+          gc.collect()
+          torch.cuda.empty_cache()
+          torch.cuda.ipc_collect()
 
     return jsonify({"saved_files": saved_files}), 200
 
