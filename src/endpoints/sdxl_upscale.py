@@ -47,7 +47,7 @@ def sdxl_upscale():
     for img_path in image_paths:
       generation_targets.append({"image_path": img_path})
 
-    cache_key = "SDXL" + ",".join(lora["path"] for lora in params["loras"])
+    cache_key = "SDXL" + params["checkpoint_file_path"] + ",".join(lora["path"] for lora in params["loras"])
     sdxl_pipe = cache_get(cache_key)
     if sdxl_pipe is None:
       sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], "upscale")

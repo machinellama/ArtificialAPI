@@ -68,7 +68,7 @@ def sdxl():
 
   print(f"Number of SDXL prompts to execute: {len(prompts)}")
 
-  cache_key = "SDXL" + ",".join(lora["path"] for lora in params["loras"])
+  cache_key = "SDXL" + params["checkpoint_file_path"] + ",".join(lora["path"] for lora in params["loras"])
   sdxl_pipe = cache_get(cache_key)
   if sdxl_pipe is None:
     sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], bool(params["input_image_path"]))
