@@ -35,7 +35,8 @@ def sdxl():
     "output_image_prefix": str(payload.get("output_image_prefix", "")),
     "output_image_suffix": str(payload.get("output_image_suffix", "")),
     "input_image_path": payload.get("input_image_path"),
-    "input_image_strength": int(payload.get("input_image_strength", 70))
+    "input_image_strength": int(payload.get("input_image_strength", 70)),
+    "shuffle_prompts": payload.get("shuffle_prompts", False)
   }
 
   required_param("prompt", params["prompt"])
@@ -50,13 +51,12 @@ def sdxl():
 
   image_paths = get_image_paths(params["input_image_path"])
 
-  prompts = params["prompt"]
-  if isinstance(prompts, str):
-    prompts = [prompts]
-  elif isinstance(prompts, list):
-    prompts = [str(p) for p in prompts]
+  if isinstance(params["prompt"], str):
+    prompts = [params["prompt"]]
+  elif isinstance(params["prompt"], list):
+    prompts = [str(p) for p in params["prompt"]]
   else:
-    prompts = [str(prompts)]
+    prompts = [str(params["prompt"])]
 
   expanded_prompts = []
   prompt_variations = params.get("prompt_replacements") or {}
@@ -64,11 +64,14 @@ def sdxl():
     variations = generate_prompt_variations(p, prompt_variations)
     expanded_prompts.extend(variations)
 
+  if params["shuffle_prompts"]:
+    random.shuffle(expanded_prompts)
+
   prompts = expanded_prompts
 
-  print(f"Number of SDXL prompts to execute: {len(prompts)}")
+  log(f"Number of SDXL prompts to execute: {len(prompts)}")
 
-  cache_key = "SDXL" + params["checkpoint_file_path"] + ",".join(lora["path"] for lora in params["loras"])
+  cache_key = "SDXL" + params["checkpoint_file_path"] + ",".join(f"{lora["path"]}-{lora["strength"]}" for lora in params["loras"])
   sdxl_pipe = cache_get(cache_key)
   if sdxl_pipe is None:
     sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], bool(params["input_image_path"]))
@@ -86,7 +89,7 @@ def sdxl():
 
     # Outer loop: iterate over each prompt in prompts array
     for pi, prompt_text in enumerate(prompts):
-      print(f"SDXL prompt {pi + 1}: {prompt_text}")
+      log(f"SDXL prompt {pi + 1} / {len(prompts)}: {prompt_text}")
 
       prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
         sdxl_pipe,

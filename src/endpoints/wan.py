@@ -6,6 +6,7 @@ from src.utils.wan_util import get_wan_pipe, load_loras
 from src.utils.sdxl_util import normalize_loras
 from src.utils.image_util import compute_dimensions_from_image
 from src.utils.cache_util import cache_set, cache_get
+from src.utils.logger import log
 import gc
 import json
 import os
@@ -142,7 +143,7 @@ def execute_wan(payload):
       pipeline = payload.get("pipeline")
       load_loras(pipeline, params["loras"], params["segment_index"])
     else:
-      cache_key = "WAN" + ",".join(lora["path"] for lora in params["loras"]) + str(bool(image_paths))
+      cache_key = "WAN" + ",".join(f"{lora["path"]}-{lora["strength"]}" for lora in params["loras"]) + str(bool(image_paths))
       pipeline = cache_get(cache_key)
       if pipeline is None:
         pipeline = get_wan_pipe(

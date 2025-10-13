@@ -74,6 +74,7 @@ Generate images using an SDXL checkpoint. Supports text-to-image and image-to-im
 | output_image_suffix | No | string | — | Optional filename suffix for saved images |
 | input_image_path | No | string | — | Path to image or folder of images for image-to-image generation. If folder, then each image in the folder will trigger a separate generation request. |
 | input_image_strength | No | integer | 70 | Amount of change applied to input image, must be between 1 and 100 inclusive. Higher number means more change. |
+| shuffle_prompts | No | boolean | false | Shuffle all expanded prompts to get outputs in random order |
 
 ```
 curl -X POST http://localhost:5700/api/sdxl \
@@ -134,7 +135,11 @@ Upscale images using an SDXL checkpoint.
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
 | upscale_path | Yes | string | — | Path to image or folder of images for upscaling. If folder, then each image in the folder will trigger a separate upscale request. |
 | prompt | No | string | — | Text prompt to generate the image. If not provided, will look for .json file with prompt. |
+| prompt_prefix | No | string | — | Prefix to add to every upscale prompt |
+| prompt_suffix | No | string | — | Suffix to add to every upscale prompt |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content. If not provided, will look for .json file with negative_prompt. |
+| negative_prompt_prefix | No | string | — | Prefix to add to every upscale negative prompt |
+| negative_prompt_suffix | No | string | — | Suffix to add to every upscale negative prompt |
 | num_images | No | integer | 1 | Number of images to generate for the prompt. Each image will be saved separately. |
 | num_steps | No | integer | 30 | Number of inference steps |
 | input_image_strength | No | integer | 51 | Amount of change applied to input image, must be between 1 and 100 inclusive. Higher number means more change. |

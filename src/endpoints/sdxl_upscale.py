@@ -7,6 +7,7 @@ from src.utils.endpoint_util import required_param, within_range_inclusive, norm
 from src.utils.file_util import get_image_paths, get_image_save_path, get_timestamp
 from src.utils.sdxl_util import get_sdxl_pipe, normalize_loras
 from src.utils.cache_util import cache_set, cache_get
+from src.utils.logger import log
 import json
 import os
 import torch
@@ -24,7 +25,11 @@ def sdxl_upscale():
     "loras": normalize_loras(payload.get("loras", []), 70),
     "upscale_path": payload.get("upscale_path"),
     "prompt": payload.get("prompt", None),
+    "prompt_prefix": payload.get("prompt_prefix", None),
+    "prompt_suffix": payload.get('prompt_suffix', None),
     "negative_prompt": payload.get("negative_prompt", None),
+    "negative_prompt_prefix": payload.get("negative_prompt_prefix", None),
+    "negative_prompt_suffix": payload.get("negative_prompt_suffix", None),
     "num_images": int(payload.get("num_images", 1)),
     "num_steps": int(payload.get("num_steps", 30)),
     "input_image_strength": int(payload.get("input_image_strength", 51)),
@@ -47,19 +52,24 @@ def sdxl_upscale():
     for img_path in image_paths:
       generation_targets.append({"image_path": img_path})
 
-    cache_key = "SDXL" + params["checkpoint_file_path"] + ",".join(lora["path"] for lora in params["loras"])
+    log(f"Number of SDXL UPSCALE prompts to execute: {len(generation_targets)}")
+
+    cache_key = "SDXL UPSCALE" + params["checkpoint_file_path"] + ",".join(f"{lora["path"]}-{lora["strength"]}" for lora in params["loras"])
     sdxl_pipe = cache_get(cache_key)
     if sdxl_pipe is None:
       sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], "upscale")
       cache_set(cache_key, sdxl_pipe)
 
-    for target in generation_targets:
+    for ti, target in enumerate(generation_targets):
+      log(f"SDXL UPSCALE prompt {ti + 1} / {len(generation_targets)}: {target["image_path"]}")
+
       for _ in range(params["num_images"]):
         if not target["image_path"].lower().endswith(".png"):
           continue
 
         lower = target["image_path"].lower()
         if "_upscale" in lower:
+          log("Skipping already upscaled image")
           continue
 
         prompt = params["prompt"]
@@ -76,7 +86,14 @@ def sdxl_upscale():
 
         # if still no prompt, skip this image
         if not prompt:
+          log("Skipping, no prompt found")
           continue
+
+        if params["prompt_prefix"]:
+          prompt = params["prompt_prefix"] + prompt
+
+        if params["prompt_suffix"]:
+          prompt = prompt + params["prompt_suffix"]
 
         negative_prompt = params["negative_prompt"]
         if not negative_prompt:
@@ -90,10 +107,16 @@ def sdxl_upscale():
             except Exception:
               negative_prompt = None
 
+        if params["negative_prompt_prefix"]:
+          negative_prompt = params["negative_prompt_prefix"] + negative_prompt
+
+        if params["negative_prompt_suffix"]:
+          negative_prompt = negative_prompt + params["negative_prompt_suffix"]
+
         prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
           sdxl_pipe,
-          prompt = f"{prompt}, high quality 8k resolution",
-          neg_prompt = f"{negative_prompt}, low quality blurry"
+          prompt = prompt,
+          neg_prompt = negative_prompt
         )
 
         base, _ = os.path.splitext(target["image_path"])
