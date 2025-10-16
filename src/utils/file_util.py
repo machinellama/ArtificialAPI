@@ -6,6 +6,7 @@ from datetime import datetime
 import subprocess
 import imageio
 from pathlib import Path
+import json
 
 def get_image_paths(input_image_path):
   image_paths = []
@@ -85,6 +86,7 @@ def get_timestamp():
   return timestamp_str
 
 def get_json_value(base, key):
+  value = None
   m = re.match(r"^(.*)_upscaled_\d+$", base)
 
   if m:
@@ -98,7 +100,8 @@ def get_json_value(base, key):
         j = json.load(jf)
         if isinstance(j, dict) and j.get(key):
           value = j.get(key)
-    except Exception:
+    except Exception as e:
+      print("Error reading/parsing JSON:", repr(e))
       value = None
 
   return value

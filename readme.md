@@ -190,7 +190,11 @@ Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to
 | gguf_path | Yes | string | — | URL or path to Wan GGUF model |
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
 | prompt | No | string | — | Text prompt to generate the video. If not found, will look for .json file with prompt. |
+| prompt_prefix | No | string | — | Prefix to add to every video prompt |
+| prompt_suffix | No | string | — | Suffix to add to every video prompt |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content |
+| negative_prompt_prefix | No | string | — | Prefix to add to every video negative prompt |
+| negative_prompt_suffix | No | string | — | Suffix to add to every video negative prompt |
 | seed | No | integer| — | Starting randomness of video. Empty or -1 will use random seeds; else given seed will be used for all videos. |
 | width | No | integer | 480 | Output video width in pixels. Width - 1 must be divisible by 4. |
 | height | No | integer | 720 | Output video height in pixels. Height - 1 must be divisible by 4. |
@@ -203,6 +207,8 @@ Generate videos using a Wan GGUF checkpoint. Supports text-to-video and image-to
 | output_video_prefix | No | string | — | Optional filename prefix for saved videos |
 | output_video_suffix | No | string | — | Optional filename suffix for saved videos |
 | input_image_path | No | string | — | Path to image or folder of images for image-to-video generation. If folder, then each image in the folder will trigger a separate generation request. |
+| shuffle_input_images | No | boolean | false | If input_image_path is provided and images found, randomly shuffle the order of generations |
+| only_include_prompts_with_keywords | No | string[] | — | Only generate videos for prompts that include any of the provided keywords |
 
 ```
 curl -X POST http://localhost:5700/api/wan \
@@ -232,7 +238,9 @@ curl -X POST http://localhost:5700/api/wan \
     "output_folder_path": "output/wan_videos",
     "output_video_prefix": "cat",
     "output_video_suffix": "v1",
-    "input_image_path": "input/reference/test.png"
+    "input_image_path": "input/reference/test.png",
+    "shuffle_input_images": true,
+    "only_include_prompts_with_keywords": ["cat", "sky"]
   }'
 ---
 {

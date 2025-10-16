@@ -37,3 +37,10 @@ def generate_prompt_variations(prompt: str, prompt_variations: dict) -> list:
       result = re.sub(r"\{\{" + re.escape(k) + r"\}\}", str(v), result)
     variations.append(result)
   return variations
+
+def prompt_contains_any(prompt: str, keywords: list[str]) -> bool:
+  prompt_norm = prompt.lower().strip()
+  for kw in keywords:
+    if kw.lower().strip() in prompt_norm:
+      return True
+  return False

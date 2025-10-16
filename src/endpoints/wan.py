@@ -7,6 +7,7 @@ from src.utils.sdxl_util import normalize_loras
 from src.utils.image_util import compute_dimensions_from_image
 from src.utils.cache_util import cache_set, cache_get
 from src.utils.logger import log
+from src.utils.prompt_util import prompt_contains_any
 import gc
 import json
 import os
@@ -14,6 +15,7 @@ import re
 import torch
 from PIL import Image
 import cv2
+import random
 
 wan_bp = Blueprint("wan", __name__, url_prefix="/api")
 
@@ -105,7 +107,11 @@ def execute_wan(payload):
     "gguf_path": payload.get("gguf_path", None),
     "loras": normalize_loras(payload.get("loras", []), 70),
     "prompt": payload.get("prompt", None),
+    "prompt_prefix": payload.get("prompt_prefix", None),
+    "prompt_suffix": payload.get('prompt_suffix', None),
     "negative_prompt": payload.get("negative_prompt", None),
+    "negative_prompt_prefix": payload.get("negative_prompt_prefix", None),
+    "negative_prompt_suffix": payload.get("negative_prompt_suffix", None),
     "seed": payload.get("seed", None),
     "width": payload.get("width", None),
     "height": payload.get("height", None),
@@ -118,7 +124,9 @@ def execute_wan(payload):
     "output_video_prefix": str(payload.get("output_video_prefix", "")),
     "output_video_suffix": str(payload.get("output_video_suffix", "")),
     "input_image_path": payload.get("input_image_path"),
-    "segment_index": payload.get("segment_index", -1)
+    "shuffle_input_images": payload.get("shuffle_input_images", False),
+    "segment_index": payload.get("segment_index", -1),
+    "only_include_prompts_with_keywords": payload.get("only_include_prompts_with_keywords")
   }
 
   required_param("gguf_path", params["gguf_path"])
@@ -134,6 +142,8 @@ def execute_wan(payload):
     params["width"] = int(params["width"])
 
   image_paths = get_image_paths(params["input_image_path"])
+  if image_paths and (params["shuffle_input_images"]):
+    random.shuffle(image_paths)
 
   saved_files = []
 
@@ -161,7 +171,11 @@ def execute_wan(payload):
     else:
       generation_targets.append({"image_path": None})
 
-    for target in generation_targets:
+    log(f"Number of WAN prompts to execute: {len(generation_targets)}")
+
+    for ti, target in enumerate(generation_targets):
+      log(f"Starting generation {ti + 1}/{len(generation_targets)}: ")
+
       for _ in range(params["num_videos"]):
         # determine prompt: use request prompt if provided, otherwise look for same-name .json with prompt field
         prompt = params["prompt"]
@@ -170,12 +184,32 @@ def execute_wan(payload):
           prompt = get_json_value(base, "prompt")
 
         if not prompt and not params["prompt"]:
+          log("No prompt found, skipping")
           continue # skip if no prompt
+
+        if params["only_include_prompts_with_keywords"]:
+          if not prompt_contains_any(prompt, params["only_include_prompts_with_keywords"]):
+            log("No prompt found, skipping")
+            continue # skip if no prompt
+
+        if params["prompt_prefix"]:
+          prompt = params["prompt_prefix"] + prompt
+
+        if params["prompt_suffix"]:
+          prompt = prompt + params["prompt_suffix"]
+
+        log(f"prompt: {prompt}")
 
         negative_prompt = params["negative_prompt"]
         if not negative_prompt and target["image_path"]:
           base = os.path.splitext(target["image_path"])[0]
           negative_prompt = get_json_value(base, "negative_prompt")
+
+        if params["negative_prompt_prefix"]:
+          negative_prompt = params["negative_prompt_prefix"] + negative_prompt
+
+        if params["negative_prompt_suffix"]:
+          negative_prompt = negative_prompt + params["negative_prompt_suffix"]
 
         # compute per-target width/height if not provided
         width = params["width"]
@@ -196,6 +230,8 @@ def execute_wan(payload):
         # ensure divisible by 16
         width = int(width) - (int(width) % 16)
         height = int(height) - (int(height) % 16)
+
+        print(f"Running with width: {width} and height: {height}")
 
         video_params = {
           **params,
