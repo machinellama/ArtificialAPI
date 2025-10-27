@@ -21,7 +21,8 @@ Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your 
 
 ## Prerequisites
 
-- Nvidia GPU with CUDA v12.8
+- Nvidia GPU with CUDA v13
+  - Linux: run `nvidia-smi` to verify your current nvidia driver and cuda version
 - (optional) Docker
 - (optional) Ollama
 
@@ -41,7 +42,6 @@ Note: All code written and tested with 64GB RAM and Nvidia 4090 24GB VRAM. Your 
 - `sudo apt install nvidia-cuda-toolkit`
   - Verify with `nvcc --version`
 - `pip install -r requirements.txt`
-- `pip install -U xformers --index-url https://download.pytorch.org/whl/cu128`
 - `pip install git+https://github.com/xhinker/sd_embed.git@main`
 - `python -m src.server`
   - Runs at `http://localhost:5700` by default

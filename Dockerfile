@@ -23,7 +23,6 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 
 RUN python3 -m pip install --no-cache-dir -r /app/requirements.txt
-RUN python3 -m pip install -U xformers --index-url https://download.pytorch.org/whl/cu128
 RUN python3 -m pip install git+https://github.com/xhinker/sd_embed.git@main
 
 COPY ./src /app/src
