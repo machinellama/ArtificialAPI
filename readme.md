@@ -60,10 +60,15 @@ Generate images using an SDXL checkpoint. Supports text-to-image and image-to-im
 | Name | Required | Type | Default | Description |
 |------|----------|------|---------|-------------|
 | checkpoint_file_path | Yes | string | — | Path to the SDXL checkpoint to load |
+| refiner_checkpoint_file_path | No | string | — | Path to the SDXL checkpoint used for image refinement |
 | loras | No | list | — | list of objects, with path and strength. Strength is between 1 and 100 inclusive. |
 | prompt | Yes | string | — | Text prompt to generate the image, can be a single string or a list of strings. If list, each prompt will trigger a request with other params. Optionally include keys in double brackets for variations. |
+| prompt_prefix | No | string | — | Prefix to add to every prompt |
+| prompt_suffix | No | string | — | Suffix to add to every prompt |
 | prompt_replacements | No | object | — | Use with double bracket keys in prompts; each key in this array can have an array of variations.  |
 | negative_prompt | Yes | string | — | Negative prompt to discourage content |
+| negative_prompt_prefix | No | string | — | Prefix to add to every negative prompt |
+| negative_prompt_suffix | No | string | — | Suffix to add to every negative prompt |
 | seed | No | integer| — | Starting randomness of image. Empty or -1 will use random seeds; else given seed will be used for all images. |
 | width | No | integer | 1024 | Output image width in pixels. Must be divisible by 8. |
 | height | No | integer | 1024 | Output image height in pixels. Must be divisible by 8. |
@@ -74,13 +79,15 @@ Generate images using an SDXL checkpoint. Supports text-to-image and image-to-im
 | output_image_suffix | No | string | — | Optional filename suffix for saved images |
 | input_image_path | No | string | — | Path to image or folder of images for image-to-image generation. If folder, then each image in the folder will trigger a separate generation request. |
 | input_image_strength | No | integer | 70 | Amount of change applied to input image, must be between 1 and 100 inclusive. Higher number means more change. |
+| refiner_point | No | integer | 80 | Point in generation to switch to the refiner model (if refiner_checkpoint_file_path provided) |
 | shuffle_prompts | No | boolean | false | Shuffle all expanded prompts to get outputs in random order |
 
 ```
 curl -X POST http://localhost:5700/api/sdxl \
   -H "Content-Type: application/json" \
   -d '{
-    "checkpoint_file_path": "models/sdxl/checkpoint/wow.safetensors",
+    "checkpoint_file_path": "models/sdxl/checkpoint/base.safetensors",
+    "refiner_checkpoint_file_path": "models/sdxl/checkpoint/refiner.safetensors",
     "loras": [
       {
         "path": "models/sdxl/lora/one.safetensors",
@@ -95,12 +102,16 @@ curl -X POST http://localhost:5700/api/sdxl \
       "A {{landscape_type}} landscape, vibrant colors, {{lighting_type}} lighting",
       "A {{species}} flying through the air",
     ],
+    prompt_prefix: "prompt prefix",
+    prompt_suffix: "prompt suffix",
     "prompt_replacements": {
       "landscape_type": ["fantasy", "cyberpunk"],
       "lighting_type": ["cinematic", "neon"],
       "species": ["cat", "dog", "hamster"]
     },
     "negative_prompt": "blurry, cartoon",
+    "negative_prompt_prefix": "negative prefix",
+    "negative_prompt_suffix": "negative suffix",
     "seed": -1,
     "width": 1024,
     "height": 1024,
@@ -110,7 +121,9 @@ curl -X POST http://localhost:5700/api/sdxl \
     "output_image_prefix": "fantasy",
     "output_image_suffix": "v1",
     "input_image_path": "input/reference/test.png",
-    "input_image_strength": 70
+    "input_image_strength": 70,
+    "refiner_point": 80,
+    "shuffle_prompts": true
   }'
 ---
 {
@@ -144,6 +157,7 @@ Upscale images using an SDXL checkpoint.
 | num_steps | No | integer | 30 | Number of inference steps |
 | input_image_strength | No | integer | 51 | Amount of change applied to input image, must be between 1 and 100 inclusive. Higher number means more change. |
 | scale | No | number | 1.5 | Scale for size of new upscaled image |
+| force_upscale | No | boolean | false | Upscale already upscaled images in a folder |
 
 ```
 curl -X POST http://localhost:5700/api/sdxl/upscale \
@@ -166,7 +180,8 @@ curl -X POST http://localhost:5700/api/sdxl/upscale \
     "num_images": 2,
     "num_steps": 30,
     "input_image_strength": 51,
-    "scale": 1.5
+    "scale": 1.5,
+    "force_upscale": false
   }'
 ---
 {

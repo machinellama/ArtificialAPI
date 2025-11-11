@@ -5,7 +5,10 @@ from typing import Optional, List
 import os
 import torch
 
-def get_sdxl_pipe(checkpoint_path, loras, is_img2img):
+def get_sdxl_pipe(checkpoint_path, refiner_checkpoint_file_path, loras, is_img2img):
+  sdxl_pipe = None
+  refiner_sdxl_pipe = None
+
   if is_img2img:
     sdxl_pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(checkpoint_path)
   else:
@@ -26,7 +29,23 @@ def get_sdxl_pipe(checkpoint_path, loras, is_img2img):
 
   sdxl_pipe.to(device="cuda", dtype=torch.float16)
 
-  return sdxl_pipe
+  if refiner_checkpoint_file_path:
+    if is_img2img:
+      refiner_sdxl_pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(
+        refiner_checkpoint_file_path,
+        text_encoder_2=sdxl_pipe.text_encoder_2,
+        vae=sdxl_pipe.vae
+      )
+    else:
+      refiner_sdxl_pipe = StableDiffusionXLPipeline.from_single_file(
+        refiner_checkpoint_file_path,
+        text_encoder_2=sdxl_pipe.text_encoder_2,
+        vae=sdxl_pipe.vae
+      )
+
+    refiner_sdxl_pipe.to(device="cuda", dtype=torch.float16)
+
+  return sdxl_pipe, refiner_sdxl_pipe
 
 def normalize_loras(raw_loras, default_strength):
   if not raw_loras:

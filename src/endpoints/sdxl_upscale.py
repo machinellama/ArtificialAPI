@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from PIL import Image
 from sd_embed.embedding_funcs import get_weighted_text_embeddings_sdxl
 from src.utils.endpoint_util import required_param, within_range_inclusive, normalize_path
-from src.utils.file_util import get_image_paths, get_image_save_path, get_timestamp
+from src.utils.file_util import get_image_paths, get_image_save_path, get_timestamp, get_json_value
 from src.utils.sdxl_util import get_sdxl_pipe, normalize_loras
 from src.utils.cache_util import cache_set, cache_get
 from src.utils.logger import log
@@ -33,7 +33,8 @@ def sdxl_upscale():
     "num_images": int(payload.get("num_images", 1)),
     "num_steps": int(payload.get("num_steps", 30)),
     "input_image_strength": int(payload.get("input_image_strength", 51)),
-    "scale": payload.get("scale", 1.5)
+    "scale": payload.get("scale", 1.5),
+    "force_upscale": payload.get("force_upscale", False)
   }
 
   required_param("checkpoint_file_path", params["checkpoint_file_path"])
@@ -57,7 +58,7 @@ def sdxl_upscale():
     cache_key = "SDXL UPSCALE" + params["checkpoint_file_path"] + ",".join(f"{lora["path"]}-{lora["strength"]}" for lora in params["loras"])
     sdxl_pipe = cache_get(cache_key)
     if sdxl_pipe is None:
-      sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], "upscale")
+      sdxl_pipe, refiner_pipe = get_sdxl_pipe(params["checkpoint_file_path"], None, params["loras"], "upscale")
       cache_set(cache_key, sdxl_pipe)
 
     for ti, target in enumerate(generation_targets):
@@ -68,21 +69,13 @@ def sdxl_upscale():
           continue
 
         lower = target["image_path"].lower()
-        if "_upscale" in lower:
+        if "_upscale" in lower and not params["force_upscale"]:
           log("Skipping already upscaled image")
           continue
 
         prompt = params["prompt"]
         if not prompt:
-          json_path = os.path.splitext(target["image_path"])[0] + ".json"
-          if os.path.isfile(json_path):
-            try:
-              with open(json_path, "r", encoding="utf-8") as jf:
-                j = json.load(jf)
-                if isinstance(j, dict) and j.get("prompt"):
-                  prompt = j.get("prompt")
-            except Exception:
-              prompt = None
+          prompt = get_json_value(os.path.splitext(target["image_path"])[0], "prompt")
 
         # if still no prompt, skip this image
         if not prompt:
@@ -97,15 +90,7 @@ def sdxl_upscale():
 
         negative_prompt = params["negative_prompt"]
         if not negative_prompt:
-          json_path = os.path.splitext(target["image_path"])[0] + ".json"
-          if os.path.isfile(json_path):
-            try:
-              with open(json_path, "r", encoding="utf-8") as jf:
-                j = json.load(jf)
-                if isinstance(j, dict) and j.get("negative_prompt"):
-                  negative_prompt = j.get("negative_prompt")
-            except Exception:
-              negative_prompt = None
+          negative_prompt = get_json_value(os.path.splitext(target["image_path"])[0], "negative_prompt")
 
         if params["negative_prompt_prefix"]:
           negative_prompt = params["negative_prompt_prefix"] + negative_prompt

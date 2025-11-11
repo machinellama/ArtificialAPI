@@ -22,10 +22,15 @@ def sdxl():
 
   params = {
     "checkpoint_file_path": normalize_path(payload.get("checkpoint_file_path", None)),
+    "refiner_checkpoint_file_path": normalize_path(payload.get("refiner_checkpoint_file_path", None)),
     "loras": normalize_loras(payload.get("loras", []), 70),
     "prompt": payload.get("prompt", None),
+    "prompt_prefix": payload.get("prompt_prefix", None),
+    "prompt_suffix": payload.get('prompt_suffix', None),
     "prompt_replacements": payload.get("prompt_replacements", None),
-    "negative_prompt": payload.get("negative_prompt", None),
+    "negative_prompt": payload.get("negative_prompt", ""),
+    "negative_prompt_prefix": payload.get("negative_prompt_prefix", None),
+    "negative_prompt_suffix": payload.get("negative_prompt_suffix", None),
     "seed": payload.get("seed", None),
     "width": payload.get("width", None),
     "height": payload.get("height", None),
@@ -36,11 +41,11 @@ def sdxl():
     "output_image_suffix": str(payload.get("output_image_suffix", "")),
     "input_image_path": payload.get("input_image_path"),
     "input_image_strength": int(payload.get("input_image_strength", 70)),
+    "refiner_point": int(payload.get("refiner_point", 80)),
     "shuffle_prompts": payload.get("shuffle_prompts", False)
   }
 
   required_param("prompt", params["prompt"])
-  required_param("negative_prompt", params["negative_prompt"])
 
   if params["height"] is not None:
     divisible_by_x("height", params["height"], 8)
@@ -71,11 +76,12 @@ def sdxl():
 
   log(f"Number of SDXL prompts to execute: {len(prompts)}")
 
-  cache_key = "SDXL" + params["checkpoint_file_path"] + ",".join(f"{lora["path"]}-{lora["strength"]}" for lora in params["loras"])
-  sdxl_pipe = cache_get(cache_key)
-  if sdxl_pipe is None:
-    sdxl_pipe = get_sdxl_pipe(params["checkpoint_file_path"], params["loras"], bool(params["input_image_path"]))
-    cache_set(cache_key, sdxl_pipe)
+  sdxl_pipe, refiner_sdxl_pipe = get_sdxl_pipe(
+    params["checkpoint_file_path"],
+    params["refiner_checkpoint_file_path"],
+    params["loras"],
+    bool(params["input_image_path"])
+  )
 
   saved_files = []
 
@@ -89,12 +95,27 @@ def sdxl():
 
     # Outer loop: iterate over each prompt in prompts array
     for pi, prompt_text in enumerate(prompts):
-      log(f"SDXL prompt {pi + 1} / {len(prompts)}: {prompt_text}")
+      prompt_to_use = prompt_text
+      if params["prompt_prefix"]:
+        prompt_to_use = params["prompt_prefix"] + prompt_to_use
+
+      if params["prompt_suffix"]:
+        prompt_to_use = prompt_to_use + params["prompt_suffix"]
+
+      negative_prompt_to_use = params["negative_prompt"]
+
+      if params["negative_prompt_prefix"]:
+        negative_prompt_to_use = params["negative_prompt_prefix"] + negative_prompt_to_use
+
+      if params["negative_prompt_suffix"]:
+        negative_prompt_to_use = negative_prompt_to_use + params["negative_prompt_suffix"]
+
+      log(f"SDXL prompt {pi + 1} / {len(prompts)}: {prompt_to_use}")
 
       prompt_embeds, prompt_neg_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = get_weighted_text_embeddings_sdxl(
         sdxl_pipe,
-        prompt = prompt_text,
-        neg_prompt = params["negative_prompt"]
+        prompt = prompt_to_use,
+        neg_prompt = negative_prompt_to_use
       )
 
       for target in generation_targets:
@@ -130,39 +151,98 @@ def sdxl():
           width = width - (width % 8)
           height = height - (height % 8)
 
+          image = None
           if target["image_path"] is None:
-            output = sdxl_pipe(
-              prompt_embeds=prompt_embeds,
-              pooled_prompt_embeds=pooled_prompt_embeds,
-              negative_prompt_embeds=prompt_neg_embeds,
-              negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
-              num_inference_steps=image_params["num_steps"],
-              height=height,
-              width=width,
-              num_images_per_prompt=1,
-              generator=gen
-            )
+            if refiner_sdxl_pipe:
+              image = sdxl_pipe(
+                prompt_embeds=prompt_embeds,
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                negative_prompt_embeds=prompt_neg_embeds,
+                negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+                num_inference_steps=image_params["num_steps"],
+                height=height,
+                width=width,
+                num_images_per_prompt=1,
+                generator=gen,
+                denoising_end=image_params["refiner_point"] / 100,
+                output_type="latent"
+              ).images
+              image = refiner_sdxl_pipe(
+                prompt_embeds=prompt_embeds,
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                negative_prompt_embeds=prompt_neg_embeds,
+                negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+                num_inference_steps=image_params["num_steps"],
+                height=height,
+                width=width,
+                num_images_per_prompt=1,
+                generator=gen,
+                denoising_start=image_params["refiner_point"] / 100,
+                image=image
+              ).images[0]
+            else:
+              image = sdxl_pipe(
+                prompt_embeds=prompt_embeds,
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                negative_prompt_embeds=prompt_neg_embeds,
+                negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+                num_inference_steps=image_params["num_steps"],
+                height=height,
+                width=width,
+                num_images_per_prompt=1,
+                generator=gen
+              ).images[0]
           else:
             init_image = Image.open(target["image_path"]).convert("RGB")
             target_size = (width, height)
             init_image = init_image.resize(target_size, resample=Image.LANCZOS)
             image_params["reference_image_path"] = target["image_path"]
 
-            output = sdxl_pipe(
-              prompt_embeds=prompt_embeds,
-              pooled_prompt_embeds=pooled_prompt_embeds,
-              negative_prompt_embeds=prompt_neg_embeds,
-              negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
-              image=init_image,
-              strength=image_params["input_image_strength"] / 100,
-              num_inference_steps=image_params["num_steps"],
-              height=height,
-              width=width,
-              num_images_per_prompt=1,
-              generator=gen
-            )
+            if refiner_sdxl_pipe:
+              image = sdxl_pipe(
+                prompt_embeds=prompt_embeds,
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                negative_prompt_embeds=prompt_neg_embeds,
+                negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+                image=init_image,
+                strength=image_params["input_image_strength"] / 100,
+                num_inference_steps=image_params["num_steps"],
+                height=height,
+                width=width,
+                num_images_per_prompt=1,
+                denoising_end=image_params["refiner_point"] / 100,
+                generator=gen,
+                output_type="latent"
+              ).images
+              image = refiner_sdxl_pipe(
+                prompt_embeds=prompt_embeds,
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                negative_prompt_embeds=prompt_neg_embeds,
+                negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+                strength=image_params["input_image_strength"] / 100,
+                num_inference_steps=image_params["num_steps"],
+                height=height,
+                width=width,
+                num_images_per_prompt=1,
+                generator=gen,
+                denoising_start=image_params["refiner_point"] / 100,
+                image=image
+              ).images[0]
+            else:  
+              image = sdxl_pipe(
+                prompt_embeds=prompt_embeds,
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                negative_prompt_embeds=prompt_neg_embeds,
+                negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+                image=init_image,
+                strength=image_params["input_image_strength"] / 100,
+                num_inference_steps=image_params["num_steps"],
+                height=height,
+                width=width,
+                num_images_per_prompt=1,
+                generator=gen
+              ).images[0]
 
-          image = output.images[0]
           path = get_image_save_path(
             image_params["output_folder_path"],
             image_params["output_image_prefix"],
